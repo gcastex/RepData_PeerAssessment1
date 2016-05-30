@@ -10,16 +10,35 @@ The interval number indicates the number of minutes since the beginning of the d
 
 Reading the file, and computing date information in POSIXlt format.
 
+```r
+library(dplyr)
+
+file="activity.csv"
+data<-read.csv(file)
+posixltdate<-as.POSIXlt(data$date)
+```
 
 
 ## What is mean total number of steps taken per day?
 
 Grouping data by day, remove days without observations, and compute total number of steps for each day.
 
+```r
+data<-mutate(data, year=posixltdate$year+1900, month=posixltdate$mon+1, day=posixltdate$mday)
+daily_data<-group_by(data, year, month, day) %>% summarize(daily_tot=sum(steps, na.rm=TRUE),obs=sum(!is.na(steps))) %>% filter(obs >0)
+```
 Mean and median of the total number of steps in a day:
+
+```r
+mean(daily_data$daily_tot)
+```
 
 ```
 ## [1] 10766.19
+```
+
+```r
+median(daily_data$daily_tot)
 ```
 
 ```
@@ -27,15 +46,30 @@ Mean and median of the total number of steps in a day:
 ```
 
 Histogram of the total number of steps in a day:
+
+```r
+hist(daily_data$daily_tot, main="Total number of steps per day", xlab="Total steps", col="blue", breaks=8)
+```
+
 ![](figure/hist1-1.png)<!-- -->
 
 ## What is the average daily activity pattern?
+
+
+```r
+by_interval <-group_by(data, interval) %>% summarize(avg=mean(steps, na.rm=TRUE))
+plot(by_interval$interval, by_interval$avg, type="l", main="Average number of steps for 5min intervals", xlab="Interval ID", ylab="Steps")
+```
 
 ![](figure/timesseries-1.png)<!-- -->
 
 ## Interval with the highest average number of steps
 
 5 min interval with the highest average total number of steps:
+
+```r
+by_interval$interval[which.max(by_interval$avg)]
+```
 
 ```
 ## [1] 835
@@ -46,11 +80,27 @@ Histogram of the total number of steps in a day:
 Select NA values in the number of steps column, and replace them with the average number of steps in this interval computed on the other days. (So, if the number of steps in the interval number 10 is missing for a given day, we replace this missing value by the average over the other days of the number of steps in the interval number 10).
 
 
+```r
+to_imput<-which(is.na(data$steps))
+ndata<-data
+for (i in to_imput) {
+    ndata$steps[i]<-by_interval$avg[which(ndata$interval[i] == by_interval$interval)[1]]
+}
+ndaily_data<-group_by(ndata, year, month, day) %>% summarize(daily_tot=sum(steps)) 
+```
 
 Mean and median of the total number of steps in a day, computed from the imputed data. 
 
+```r
+mean(ndaily_data$daily_tot)
+```
+
 ```
 ## [1] 10766.19
+```
+
+```r
+median(ndaily_data$daily_tot)
 ```
 
 ```
@@ -58,6 +108,11 @@ Mean and median of the total number of steps in a day, computed from the imputed
 ```
 
 Histogram of the imputed data.
+
+```r
+hist(ndaily_data$daily_tot, main="Total number of steps per day - Imputed data", xlab="Total steps", col="green", breaks=8)
+```
+
 ![](figure/hist2-1.png)<!-- -->
 
 The imputed data gives very similar results to the non imputed data. This seems to indicate the NA values are homogeneously distributed among the intervals.
@@ -65,6 +120,15 @@ The imputed data gives very similar results to the non imputed data. This seems 
 ## Are there differences in activity patterns between weekdays and weekends?
 
 Group the data by day, after splitting the data in two groups depending on the day of the week: weekday or weekend.
+
+
+```r
+ndata$wday<-factor(weekdays(posixltdate)=="Saturday"|weekdays(posixltdate)=="Sunday", levels=c(FALSE, TRUE), labels=c("Weekday","Weekend"))
+
+by_wdinterval <-group_by(ndata, wday, interval) %>% summarize(avg=mean(steps))
+library(lattice)
+xyplot(avg ~ interval | wday, data=by_wdinterval, layout=c(1,2), type="l", main="Average number of steps")
+```
 
 ![](figure/timeseries2-1.png)<!-- -->
 
